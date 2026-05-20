@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔮 Cinematic Tarot Circle Student Picker</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #050014;
+            font-family: 'Prompt', sans-serif;
+            color: #ffd700;
+        }
+
+        #canvas-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* ส่วนหัวข้อและสถานะด้านบน */
+        .ui-header {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin: 0;
+            letter-spacing: 2px;
+            text-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+        }
+
+        .status {
+            color: #b39ddb;
+            font-size: 1.1rem;
+            margin-top: 5px;
+        }
+
+        /* กล่องส่องเว็บแคมมุมขวาล่าง */
+        .webcam-preview {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 160px;
+            height: 120px;
+            border: 2px solid rgba(255, 215, 0, 0.4);
+            border-radius: 10px;
+            overflow: hidden;
+            z-index: 10;
+            transform: scaleX(-1);
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+
+        #webcam {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <div class="ui-header">
+        <h1>🔮 วงล้อคาถาทาโรต์สุ่มนักเรียน 🔮</h1>
+        <div class="status" id="status-text">✨ กำลังรวบรวมพลังงานกล้อง... ✨</div>
+    </div>
+
+    <div class="webcam-preview">
+        <video id="webcam" autoplay playsinline></video>
+    </div>
+
+    <script>
+        // ----------------- ระบบดึงรูปภาพอัตโนมัติ -----------------
+        // ดึงไฟล์ภาพจากโฟลเดอร์ images/1.png ถึง images/25.png ตรงตามที่คุณตั้งไว้เป๊ะ ๆ ครับ
+        const totalStudents = 25;
+        const students = [];
+        for (let i = 1; i <= totalStudents; i++) {
+            students.push({
+                id: i,
+                imgFront: `images/${i}.png` 
+            });
+        }
+        // --------------------------------------------------------
+
+        let scene, camera, renderer, cardsGroup;
+        let pointerSphere;
+        let raycaster = new THREE.Raycaster();
+        let hand2D = new THREE.Vector2(-999, -999);
+        let activeCard = null;
+
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+            
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x050014, 0.02);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 0, 8); 
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            scene.add(new THREE.AmbientLight(0x442266, 2));
+            const dirLight = new THREE.DirectionalLight(0xffddaa, 1.5);
+            dirLight.position.set(0, 5, 5);
+            scene.add(dirLight);
+
+            cardsGroup = new THREE.Group();
+            scene.add(cardsGroup);
+
+            createTarotCircle();
+
+            const pointerGeo = new THREE.SphereGeometry(0.1, 32, 32);
+            const pointerMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.8 });
+            pointerSphere = new THREE.Mesh(pointerGeo, pointerMat);
+            scene.add(pointerSphere);
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function createTarotCircle() {
+            const radius = 3.5; 
+            const cardW = 0.6;  
+            const cardH = 1.0;
+            
+            const textureLoader = new THREE.TextureLoader();
+
+            students.forEach((student, index) => {
+                const cardPivot = new THREE.Group();
+                const angle = (index / totalStudents) * Math.PI * 2;
+
+                const cardGeo = new THREE.BoxGeometry(cardW, cardH, 0.02);
+                const backMat = new THREE.MeshStandardMaterial({ color: 0x2a004f, roughness: 0.3, metalness: 0.5 });
+                
+                // โหลดรูปหน้าไพ่ (.png) ของคุณครู เข้าสู่ระบบ 3D
+                const frontTex = textureLoader.load(student.imgFront, undefined, undefined, (err) => {
+                    frontMat.color.setHex(0xd4af37); // ถ้าหาไฟล์ไม่เจอ จะแสดงเป็นแผ่นสีทองแทน
+                });
+                const frontMat = new THREE.MeshStandardMaterial({ map: frontTex, roughness: 0.2 });
+
+                const materials = [
+                    backMat, backMat, backMat, backMat, 
+                    frontMat, // ด้านหน้า
+                    backMat   // ด้านหลัง
+                ];
+
+                const cardMesh = new THREE.Mesh(cardGeo, materials);
+                cardMesh.position.set(0, 0, 0);
+                cardPivot.add(cardMesh);
+
+                cardPivot.position.x = Math.cos(angle) * radius;
+                cardPivot.position.y = Math.sin(angle) * radius;
+                cardPivot.rotation.z = angle - Math.PI / 2;
+
+                cardPivot.userData = {
+                    index: index,
+                    origX: cardPivot.position.x,
+                    origY: cardPivot.position.y,
+                    origRz: cardPivot.rotation.z,
+                    isChosen: false
+                };
+
+                cardsGroup.add(cardPivot);
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (!activeCard) {
+                cardsGroup.rotation.z += 0.002; // วงล้อหมุนเองเรื่อยๆ ตอนยังไม่เลือก
+            }
+
+            raycaster.setFromCamera(hand2D, camera);
+            const intersects = raycaster.intersectObjects(cardsGroup.children, true);
+
+            if (intersects.length > 0) {
+                let hitMesh = intersects[0].object;
+                let collidedCard = hitMesh.parent;
+
+                let target3D = new THREE.Vector3();
+                raycaster.ray.at(6, target3D);
+                pointerSphere.position.copy(target3D);
+
+                if (activeCard !== collidedCard) {
+                    if (activeCard) resetCard(activeCard);
+                    
+                    activeCard = collidedCard;
+                    selectCard(activeCard);
+                }
+            } else {
+                if (activeCard) {
+                    resetCard(activeCard);
+                    activeCard = null;
+                }
+                pointerSphere.position.set(-999,-999,-999);
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function selectCard(card) {
+            card.userData.isChosen = true;
+            document.getElementById('status-text').innerText = `✨ ชะตาลิขิตเลือกไพ่ใบที่ ${card.userData.index + 1} ✨`;
+            document.getElementById('status-text').style.color = "#00ffff";
+
+            // ดึงการ์ดมาตรงกลาง ขยายใหญ่ และหมุน 180 องศาเพื่อโชว์รูปนักเรียน (.png) ที่คุณเตรียมไว้
+            gsap.to(card.position, { x: 0, y: 0, z: 3, duration: 0.6, ease: "power2.out" });
+            gsap.to(card.rotation, { x: 0, y: Math.PI, z: 0, duration: 0.6, ease: "power2.out" });
+        }
+
+        function resetCard(card) {
+            card.userData.isChosen = false;
+            document.getElementById('status-text').innerText = "🖐 ยื่นนิ้วชี้ของคุณเข้าหากล้อง เพื่อเลือกไพ่ผู้โชคดี";
+            document.getElementById('status-text').style.color = "#b39ddb";
+
+            gsap.to(card.position, { x: card.userData.origX, y: card.userData.origY, z: 0, duration: 0.6, ease: "power2.inOut" });
+            gsap.to(card.rotation, { x: 0, y: 0, z: card.userData.origRz, duration: 0.6, ease: "power2.inOut" });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- ระบบ AI ตรวจจับนิ้วชี้ (MediaPipe) ---
+        const videoElement = document.getElementById('webcam');
+        const statusText = document.getElementById('status-text');
+
+        function onResults(results) {
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const indexTip = results.multiHandLandmarks[0][8]; // ปลายนิ้วชี้
+
+                hand2D.x = -(indexTip.x * 2 - 1); 
+                hand2D.y = -(indexTip.y * 2 - 1);
+            } else {
+                hand2D.set(-999, -999);
+            }
+        }
+
+        const hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.6,
+            minTrackingConfidence: 0.6
+        });
+        hands.onResults(onResults);
+
+        const cameraStream = new Camera(videoElement, {
+            onFrame: async () => {
+                await hands.send({ image: videoElement });
+            },
+            width: 320,
+            height: 240
+        });
+
+        init3D();
+        animate();
+
+        cameraStream.start().then(() => {
+            statusText.innerText = "🖐 ยื่นนิ้วชี้ของคุณเข้าหากล้อง เพื่อเลือกไพ่ผู้โชคดี";
+        }).catch(err => {
+            statusText.innerText = "⚠️ ไม่สามารถเข้าถึงกล้องเว็บแคมได้";
+        });
+    </script>
+</body>
+</html>
