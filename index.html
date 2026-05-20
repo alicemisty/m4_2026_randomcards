@@ -1,767 +1,299 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔮 今日の一枚 - AI Tarot Oracle</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 
-<title>🔮 AI Tarot Oracle</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Noto+Serif+JP:wght@700&family=Prompt:wght@400;600&display=swap');
 
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: radial-gradient(circle at center, #1a0033 0%, #030010 100%);
+            font-family: 'Noto Serif JP', 'Prompt', sans-serif;
+            color: #fff;
+        }
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+        #canvas-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
 
-<style>
+        /* จัดตำแหน่ง UI ข้อความให้อยู่ด้านบน สวยงาม เป็นระเบียบ */
+        .ui-header {
+            position: absolute;
+            top: 40px;
+            width: 100%;
+            text-align: center;
+            z-index: 10;
+            pointer-events: none; /* ยอมให้เมาส์คลิกทะลุไปโดนไพ่ด้านหลังได้ */
+        }
 
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Noto+Serif+JP:wght@700&display=swap');
+        h1 {
+            font-size: 2.8rem;
+            margin: 0;
+            font-weight: 700;
+            letter-spacing: 6px;
+            background: linear-gradient(to bottom, #ffffff 0%, #ffd700 60%, #ff9900 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(157, 23, 248, 0.5);
+        }
 
-*{
-    box-sizing:border-box;
-}
+        .subtitle {
+            font-size: 1.2rem;
+            color: #d8b4fe;
+            margin-top: 8px;
+            letter-spacing: 3px;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
 
-body{
-    margin:0;
-    overflow:hidden;
-    background:
-    radial-gradient(circle at top,#1a0033,#030010 60%);
-    font-family:'Noto Serif JP',serif;
-}
-
-#canvas-container{
-    position:fixed;
-    inset:0;
-}
-
-.ui{
-    position:fixed;
-    top:0;
-    left:0;
-    width:100%;
-    z-index:20;
-    padding:20px;
-    pointer-events:none;
-}
-
-.title{
-    text-align:center;
-    margin-top:10px;
-}
-
-h1{
-    margin:0;
-    font-size:clamp(2rem,5vw,4rem);
-    letter-spacing:6px;
-
-    background:linear-gradient(
-        to bottom,
-        #fff,
-        #ffd700,
-        #ff9d00
-    );
-
-    -webkit-background-clip:text;
-    -webkit-text-fill-color:transparent;
-
-    text-shadow:
-    0 0 30px rgba(255,215,0,0.4);
-}
-
-.subtitle{
-    color:#e9d5ff;
-    margin-top:10px;
-    font-size:clamp(.9rem,2vw,1.1rem);
-}
-
-#status{
-    margin-top:18px;
-    color:#fff;
-    font-size:1rem;
-}
-
-.webcam-box{
-    position:fixed;
-    right:18px;
-    bottom:18px;
-    width:180px;
-    height:135px;
-    border-radius:16px;
-    overflow:hidden;
-
-    border:2px solid rgba(255,255,255,.2);
-
-    box-shadow:
-    0 0 20px rgba(0,0,0,.8),
-    0 0 30px rgba(168,85,247,.4);
-
-    z-index:30;
-
-    backdrop-filter:blur(10px);
-}
-
-video{
-    width:100%;
-    height:100%;
-    object-fit:cover;
-    transform:scaleX(-1);
-}
-
-.gesture-box{
-    position:fixed;
-    left:20px;
-    bottom:20px;
-    z-index:30;
-
-    background:rgba(0,0,0,.4);
-
-    border:1px solid rgba(255,255,255,.1);
-
-    padding:16px 20px;
-    border-radius:18px;
-
-    color:white;
-
-    backdrop-filter:blur(10px);
-}
-
-.gesture{
-    margin:6px 0;
-    opacity:.8;
-}
-
-.magic-flash{
-    position:fixed;
-    inset:0;
-    pointer-events:none;
-    background:radial-gradient(circle,#ffffff66,transparent 60%);
-    opacity:0;
-    z-index:50;
-}
-
-</style>
+        .status {
+            color: #ffd700;
+            font-size: 1.1rem;
+            margin-top: 15px;
+            background: rgba(15, 5, 30, 0.7);
+            padding: 8px 25px;
+            display: inline-block;
+            border-radius: 25px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+        }
+    </style>
 </head>
-
 <body>
 
-<div id="canvas-container"></div>
+    <div id="canvas-container"></div>
 
-<div class="ui">
-    <div class="title">
-        <h1>🔮 今日の一枚 🔮</h1>
-
-        <div class="subtitle">
-            👆 ชี้ไพ่ • ✊ กำมือหยิบ • 👉 ปัดเพื่อคืนไพ่
-        </div>
-
-        <div id="status">
-            🌌 กำลังเปิดประตูแห่งไพ่...
-        </div>
+    <div class="ui-header">
+        <h1>🔮 今日の一枚 • AI タロット 🔮</h1>
+        <div class="subtitle">คลิกเลือกไพ่ทาโรต์เพื่อเปิดดวงชะตานักเรียน</div>
+        <div class="status" id="status-text">✨ 運命のカードを1枚クリックしてください (คลิกเลือกไพ่แห่งโชคชะตา 1 ใบ) ✨</div>
     </div>
-</div>
 
-<div class="gesture-box">
-    <div class="gesture">👆 ชี้ = เลือกไพ่</div>
-    <div class="gesture">✊ กำมือ = หยิบไพ่</div>
-    <div class="gesture">👉 ปัด = ส่งไพ่กลับ</div>
-</div>
-
-<div class="webcam-box">
-    <video id="webcam" autoplay playsinline muted></video>
-</div>
-
-<div class="magic-flash" id="flash"></div>
-
-<script>
-
-let scene,camera,renderer;
-let raycaster;
-let starField;
-
-const cards=[];
-
-const totalCards=55;
-const uniqueStudents=25;
-
-let hoveredCard=null;
-let selectedCard=null;
-let revealedCard=null;
-
-let hand2D=new THREE.Vector2(-999,-999);
-
-let pointerSphere;
-
-let lastIndexX=0;
-let swipeVelocity=0;
-
-let gesture="NONE";
-
-const statusEl=document.getElementById("status");
-
-const flash=document.getElementById("flash");
-
-
-// ------------------ SOUND ------------------
-
-const cardSound=new Audio("sounds/card.mp3");
-const magicSound=new Audio("sounds/magic.mp3");
-
-cardSound.volume=.5;
-magicSound.volume=.6;
-
-function playCardSound(){
-    cardSound.currentTime=0;
-    cardSound.play();
-}
-
-function playMagic(){
-    magicSound.currentTime=0;
-    magicSound.play();
-}
-
-
-// ------------------ INIT ------------------
-
-function init(){
-
-    scene=new THREE.Scene();
-
-    scene.fog=new THREE.FogExp2(0x050010,.03);
-
-    camera=new THREE.PerspectiveCamera(
-        50,
-        window.innerWidth/window.innerHeight,
-        .1,
-        1000
-    );
-
-    camera.position.set(0,-.5,9);
-
-    renderer=new THREE.WebGLRenderer({
-        antialias:true
-    });
-
-    renderer.setSize(
-        window.innerWidth,
-        window.innerHeight
-    );
-
-    renderer.setPixelRatio(
-        Math.min(window.devicePixelRatio,2)
-    );
-
-    renderer.outputEncoding=THREE.sRGBEncoding;
-
-    document
-    .getElementById("canvas-container")
-    .appendChild(renderer.domElement);
-
-    raycaster=new THREE.Raycaster();
-
-    createLights();
-    createStars();
-    createCards();
-    createPointer();
-
-    animate();
-
-    window.addEventListener("resize",onResize);
-
-}
-
-function createLights(){
-
-    scene.add(
-        new THREE.AmbientLight(0x8844ff,2)
-    );
-
-    const light=new THREE.PointLight(
-        0xffcc88,
-        2,
-        30
-    );
-
-    light.position.set(0,5,5);
-
-    scene.add(light);
-
-}
-
-function createStars(){
-
-    const geo=new THREE.BufferGeometry();
-
-    const count=2500;
-
-    const pos=new Float32Array(count*3);
-
-    for(let i=0;i<count*3;i+=3){
-
-        pos[i]=(Math.random()-.5)*80;
-        pos[i+1]=(Math.random()-.5)*80;
-        pos[i+2]=(Math.random()-.5)*80;
-
-    }
-
-    geo.setAttribute(
-        "position",
-        new THREE.BufferAttribute(pos,3)
-    );
-
-    const mat=new THREE.PointsMaterial({
-        color:0xffffff,
-        size:.08,
-        transparent:true,
-        opacity:.8
-    });
-
-    starField=new THREE.Points(geo,mat);
-
-    scene.add(starField);
-
-}
-
-function createPointer(){
-
-    const geo=new THREE.SphereGeometry(.08,32,32);
-
-    const mat=new THREE.MeshBasicMaterial({
-        color:0x00ffee
-    });
-
-    pointerSphere=new THREE.Mesh(geo,mat);
-
-    scene.add(pointerSphere);
-
-}
-
-function createCards(){
-
-    const loader=new THREE.TextureLoader();
-
-    const backCanvas=document.createElement("canvas");
-
-    backCanvas.width=256;
-    backCanvas.height=384;
-
-    const ctx=backCanvas.getContext("2d");
-
-    ctx.fillStyle="#1a0030";
-    ctx.fillRect(0,0,256,384);
-
-    ctx.strokeStyle="#ffd700";
-    ctx.lineWidth=8;
-    ctx.strokeRect(14,14,228,356);
-
-    ctx.font="50px serif";
-    ctx.fillStyle="#ffd700";
-    ctx.fillText("☾",105,200);
-
-    const backTex=new THREE.CanvasTexture(backCanvas);
-
-    for(let i=0;i<totalCards;i++){
-
-        const id=(i%uniqueStudents)+1;
-
-        const geo=new THREE.BoxGeometry(
-            .85,
-            1.35,
-            .03
-        );
-
-        const frontMat=new THREE.MeshStandardMaterial({
-            roughness:.25
-        });
-
-        loader.load(
-
-            `images/${id}.png`,
-
-            (tex)=>{
-
-                tex.encoding=THREE.sRGBEncoding;
-
-                frontMat.map=tex;
-                frontMat.needsUpdate=true;
-
+    <script>
+        const totalCards = 45; // จำนวนไพ่ที่เรียงในวง เพื่อให้ดูหนาแน่นสวยงามพอดีๆ
+        const uniqueStudents = 25; // รูป 1.png ถึง 25.png
+        let cards = [];
+        let scene, camera, renderer, starPoints, raycaster;
+        let mouse = new THREE.Vector2();
+        let activeRevealedCard = null; // เช็กว่ามีไพ่ใบไหนเปิดป็อบอัพอยู่ไหม
+
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+            
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x0a001a, 0.03);
+
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+            // ปรับตำแหน่งกล้องให้อยู่ในมุมมองที่เห็นไพ่อยู่ครึ่งล่างของจออย่างสมดุล
+            camera.position.set(0, 0.5, 8.5); 
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            // เพิ่มแสงสว่างรอบทิศทางให้หน้าไพ่สว่างสดใส รูปไม่มืดดำ
+            scene.add(new THREE.AmbientLight(0xffffff, 1.5)); 
+            const directionalLight = new THREE.DirectionalLight(0xfff5e6, 1.2);
+            directionalLight.position.set(0, 5, 5);
+            scene.add(directionalLight);
+
+            createUniverseBackground();
+            createBeautifulTarotFan();
+
+            raycaster = new THREE.Raycaster();
+
+            // ลงทะเบียนเหตุการณ์คลิกเมาส์/แตะหน้าจอ
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('click', onCardClick);
+        }
+
+        // 1. สร้างพื้นหลังจักรวาลดวงดาวระยิบระยับ
+        function createUniverseBackground() {
+            const starGeo = new THREE.BufferGeometry();
+            const starCount = 2000;
+            const pos = new Float32Array(starCount * 3);
+
+            for (let i = 0; i < starCount * 3; i += 3) {
+                pos[i] = (Math.random() - 0.5) * 50;
+                pos[i+1] = (Math.random() - 0.5) * 50;
+                pos[i+2] = (Math.random() - 0.5) * 50;
             }
 
-        );
-
-        const backMat=new THREE.MeshStandardMaterial({
-            map:backTex
-        });
-
-        const materials=[
-            backMat,
-            backMat,
-            backMat,
-            backMat,
-            backMat,
-            frontMat
-        ];
-
-        const card=new THREE.Mesh(
-            geo,
-            materials
-        );
-
-        const angle=(i/totalCards)*Math.PI*2;
-
-        const radiusX=5;
-        const radiusY=3.2;
-
-        const x=Math.cos(angle)*radiusX;
-        const y=Math.sin(angle)*radiusY-1;
-        const z=-Math.abs(Math.cos(angle));
-
-        card.position.set(x,y,z);
-
-        card.rotation.z=angle-Math.PI/2;
-        card.rotation.x=.3;
-
-        card.userData={
-            id,
-            ox:x,
-            oy:y,
-            oz:z,
-            rx:card.rotation.x,
-            rz:card.rotation.z
-        };
-
-        cards.push(card);
-
-        scene.add(card);
-
-    }
-
-}
-
-
-// ------------------ ANIMATION ------------------
-
-function animate(){
-
-    requestAnimationFrame(animate);
-
-    const t=Date.now()*.001;
-
-    starField.rotation.y+=.0005;
-
-    starField.material.opacity=
-    .5+Math.sin(t*2)*.3;
-
-    raycaster.setFromCamera(
-        hand2D,
-        camera
-    );
-
-    if(selectedCard){
-
-        let pos=new THREE.Vector3();
-
-        raycaster.ray.at(6,pos);
-
-        selectedCard.position.lerp(pos,.15);
-
-        selectedCard.rotation.set(0,0,0);
-
-    }else{
-
-        const hit=raycaster.intersectObjects(cards);
-
-        if(hit.length){
-
-            const card=hit[0].object;
-
-            if(hoveredCard!==card){
-
-                resetHover();
-
-                hoveredCard=card;
-
-                gsap.to(card.position,{
-                    z:1,
-                    duration:.2
-                });
-
-            }
-
-        }else{
-
-            resetHover();
-
-        }
-
-    }
-
-    let pointerPos=new THREE.Vector3();
-
-    raycaster.ray.at(6,pointerPos);
-
-    pointerSphere.position.copy(pointerPos);
-
-    renderer.render(scene,camera);
-
-}
-
-function resetHover(){
-
-    if(hoveredCard && hoveredCard!==selectedCard){
-
-        gsap.to(
-            hoveredCard.position,
-            {
-                x:hoveredCard.userData.ox,
-                y:hoveredCard.userData.oy,
-                z:hoveredCard.userData.oz,
-                duration:.3
-            }
-        );
-
-    }
-
-    hoveredCard=null;
-
-}
-
-
-// ------------------ REVEAL ------------------
-
-function revealCard(card){
-
-    if(revealedCard && revealedCard!==card){
-
-        sendBack(revealedCard);
-
-    }
-
-    revealedCard=card;
-
-    playCardSound();
-    playMagic();
-
-    gsap.to(flash,{
-        opacity:1,
-        duration:.15,
-        yoyo:true,
-        repeat:1
-    });
-
-    gsap.to(card.position,{
-        x:0,
-        y:.4,
-        z:4.8,
-        duration:.5
-    });
-
-    gsap.to(card.rotation,{
-        x:0,
-        y:0,
-        z:0,
-        duration:.5
-    });
-
-    statusEl.innerHTML=
-    `✨ ไพ่หมายเลข ${card.userData.id} ✨`;
-
-}
-
-function sendBack(card){
-
-    gsap.to(card.position,{
-        x:card.userData.ox,
-        y:card.userData.oy,
-        z:card.userData.oz,
-        duration:.5
-    });
-
-    gsap.to(card.rotation,{
-        x:card.userData.rx,
-        y:0,
-        z:card.userData.rz,
-        duration:.5
-    });
-
-    revealedCard=null;
-
-}
-
-
-// ------------------ GESTURE ------------------
-
-const video=document.getElementById("webcam");
-
-const hands=new Hands({
-    locateFile:(file)=>
-    `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-});
-
-hands.setOptions({
-    maxNumHands:1,
-    modelComplexity:1,
-    minDetectionConfidence:.7,
-    minTrackingConfidence:.7
-});
-
-hands.onResults(onResults);
-
-function distance(a,b){
-
-    return Math.sqrt(
-        Math.pow(a.x-b.x,2)+
-        Math.pow(a.y-b.y,2)
-    );
-
-}
-
-function onResults(results){
-
-    if(
-        !results.multiHandLandmarks ||
-        results.multiHandLandmarks.length===0
-    ){
-        return;
-    }
-
-    const hand=results.multiHandLandmarks[0];
-
-    const thumb=hand[4];
-    const index=hand[8];
-    const middle=hand[12];
-    const palm=hand[0];
-
-    hand2D.x=-(index.x*2-1);
-    hand2D.y=-(index.y*2-1);
-
-    const pinch=distance(
-        thumb,
-        index
-    );
-
-    const fist=
-        distance(index,palm)<.15 &&
-        distance(middle,palm)<.15;
-
-    swipeVelocity=index.x-lastIndexX;
-
-    lastIndexX=index.x;
-
-    // 👆 POINT
-    if(!fist && pinch>.08){
-
-        gesture="POINT";
-
-        statusEl.innerHTML=
-        "👆 ชี้ไพ่เพื่อเลือก";
-
-    }
-
-    // ✊ FIST
-    if(fist){
-
-        gesture="FIST";
-
-        statusEl.innerHTML=
-        "✊ กำลังจับไพ่";
-
-        if(
-            hoveredCard &&
-            !selectedCard
-        ){
-
-            selectedCard=hoveredCard;
-
-        }
-
-    }else{
-
-        if(selectedCard){
-
-            revealCard(selectedCard);
-
-            selectedCard=null;
-
-        }
-
-    }
-
-    // 👉 SWIPE
-    if(Math.abs(swipeVelocity)>.03){
-
-        gesture="SWIPE";
-
-        statusEl.innerHTML=
-        "👉 ปัดเพื่อคืนไพ่";
-
-        if(revealedCard){
-
-            sendBack(revealedCard);
-
-        }
-
-    }
-
-}
-
-
-// ------------------ CAMERA ------------------
-
-async function setupCamera(){
-
-    try{
-
-        const stream=
-        await navigator.mediaDevices.getUserMedia({
-            video:true
-        });
-
-        video.srcObject=stream;
-
-        async function detect(){
-
-            await hands.send({
-                image:video
+            starGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            const starMat = new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 0.08,
+                transparent: true,
+                opacity: 0.8
             });
 
-            requestAnimationFrame(detect);
-
+            starPoints = new THREE.Points(starGeo, starMat);
+            scene.add(starPoints);
         }
 
-        detect();
+        // 2. เรียงไพ่เป็นรูปวงรีสวยงาม นิ่งสงบอยู่ด้านล่างข้อความ
+        function createBeautifulTarotFan() {
+            const textureLoader = new THREE.TextureLoader();
+            
+            // วาดลวดลายหลังไพ่สีม่วงขอบทองหรูหราอัจฉริยะ (รูปไม่ดำแน่นอนเพราะสร้างจากระบบ)
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 384;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#22003c'; ctx.fillRect(0, 0, 256, 384);
+            ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 10; ctx.strokeRect(12, 12, 232, 360);
+            ctx.strokeStyle = '#9333ea'; ctx.lineWidth = 3; ctx.strokeRect(22, 22, 212, 340);
+            ctx.fillStyle = '#ffd700'; ctx.font = '45px serif'; ctx.fillText('✨', 106, 190);
+            const backTex = new THREE.CanvasTexture(canvas);
 
-    }catch(e){
+            // พิกัดวงรีสำหรับปาดไพ่ไว้ครึ่งล่างของจอ
+            const radiusX = 4.8;
+            const radiusY = 2.8;
 
-        statusEl.innerHTML=
-        "🖱️ webcam denied";
+            for (let i = 0; i < totalCards; i++) {
+                const studentId = (i % uniqueStudents) + 1;
+                const cardGeo = new THREE.BoxGeometry(0.72, 1.15, 0.02);
+                
+                // โหลดรูปภาพนักเรียนจากโฟลเดอร์ image/ ของคุณครู
+                const frontTex = textureLoader.load(`image/${studentId}.png`, 
+                    (texture) => {
+                        // เมื่อโหลดสำเร็จ ตั้งค่าให้ภาพคมชัด ไม่เบลอ
+                        texture.minFilter = THREE.LinearFilter;
+                    }, 
+                    undefined, 
+                    () => {
+                        // แผนสำรองเผื่อคุณครูใช้โฟลเดอร์ชื่อ images (มี s)
+                        frontTex.image.src = `images/${studentId}.png`;
+                    }
+                );
+                
+                // กำหนด Material ทั้งฝั่งหน้าและหลังให้สะท้อนแสงสวยงาม
+                const frontMat = new THREE.MeshStandardMaterial({ map: frontTex, side: THREE.DoubleSide });
+                const backMat = new THREE.MeshStandardMaterial({ map: backTex, side: THREE.DoubleSide });
+                
+                // อัปเดตเพื่อให้แสดงผลฝั่งตรงข้ามกันอย่างถูกต้อง (แก้ปัญหารูปดำ)
+                const materials = [backMat, backMat, backMat, backMat, backMat, frontMat];
+                const card = new THREE.Mesh(cardGeo, materials);
 
-    }
+                // คำนวณองศาให้แผ่เรียงเป็นครึ่งวงรีด้านล่างอย่างสวยงาม
+                const angleOffset = Math.PI * 0.12; 
+                const ang = angleOffset + (i / (totalCards - 1)) * (Math.PI * 2 - angleOffset * 2);
+                
+                const targetX = Math.cos(ang) * radiusX;
+                const targetY = Math.sin(ang) * radiusY - 1.2; // ดึงตำแหน่งลงมาด้านล่างเพื่อหลบข้อความหัวเว็บ
+                const targetZ = -Math.abs(Math.cos(ang)) * 0.5;
 
-}
+                card.position.set(targetX, targetY, targetZ);
+                
+                // ตั้งค่ามุมเอียงของไพ่แต่ละใบให้หันหน้าเข้าสู่จุดศูนย์กลางอย่างเป็นระเบียบ
+                card.rotation.set(0.2, 0, ang - Math.PI / 2);
 
+                // เก็บค่าตำแหน่งดั้งเดิมไว้เพื่อใช้ตอนส่งไพ่กลับเข้าวง
+                card.userData = {
+                    studentId: studentId,
+                    origX: targetX,
+                    origY: targetY,
+                    origZ: targetZ,
+                    origRx: card.rotation.x,
+                    origRy: card.rotation.y,
+                    origRz: card.rotation.z,
+                    isRevealed: false
+                };
 
-// ------------------ RESIZE ------------------
+                cards.push(card);
+                scene.add(card);
+            }
+        }
 
-function onResize(){
+        // 3. ระบบคลิกป็อบอัพและส่งกลับ
+        function onCardClick(event) {
+            // แปลงพิกัดเมาส์ให้เป็นพิกัดระบบ 3D
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-    camera.aspect=
-    window.innerWidth/window.innerHeight;
+            raycaster.setFromCamera(mouse, camera);
 
-    camera.updateProjectionMatrix();
+            // ถ้าตอนนี้มีไพ่เปิดป็อบอัพค้างอยู่กลางจอ แล้วเราคลิกที่ไพ่ใบนั้นซ้ำ มันจะบินกลับเข้าวงทันที
+            if (activeRevealedCard) {
+                const intersects = raycaster.intersectObject(activeRevealedCard);
+                if (intersects.length > 0) {
+                    sendCardBack(activeRevealedCard);
+                    return;
+                }
+            }
 
-    renderer.setSize(
-        window.innerWidth,
-        window.innerHeight
-    );
+            // ตรวจจับการคลิกเลือกไพ่ใบใหม่
+            const intersects = raycaster.intersectObjects(cards);
+            if (intersects.length > 0) {
+                const clickedCard = intersects[0].object;
 
-}
+                if (!clickedCard.userData.isRevealed) {
+                    // ถ้ามีไพ่ใบอื่นเปิดอยู่ก่อนหน้า ให้ส่งใบเก่ากลับไปก่อน
+                    if (activeRevealedCard) {
+                        sendCardBack(activeRevealedCard);
+                    }
 
+                    // เปิดไพ่ใบใหม่ขึ้นมา
+                    activeRevealedCard = clickedCard;
+                    revealCardPopUp(clickedCard);
+                }
+            }
+        }
 
-// ------------------ START ------------------
+        // ฟังก์ชันสั่งให้ไพ่พุ่งขึ้นมาเป็นป็อบอัพหงายหน้าตรงกลางจอ
+        function revealCardPopUp(card) {
+            card.userData.isRevealed = true;
+            document.getElementById('status-text').innerText = `🔮 運命の生徒：${card.userData.studentId} 番 (นักเรียนผู้โชคดีคือเลขที่ ${card.userData.studentId}) 🔮`;
+            document.getElementById('status-text').style.color = "#ffd700";
 
-init();
-setupCamera();
+            // บินมาตรงกลางหน้าจอ ยกระดับความสูงขึ้นเล็กน้อย ขยับเข้าใกล้กล้อง และหมุนพลิกหงาย 180 องศาเพื่อโชว์รูปนักเรียนชัดๆ
+            gsap.to(card.position, { x: 0, y: 0.6, z: 4.6, duration: 0.6, ease: "back.out(1.2)" });
+            gsap.to(card.rotation, { x: 0, y: Math.PI, z: 0, duration: 0.6, ease: "power2.out" });
+        }
 
-</script>
+        // ฟังก์ชันส่งไพ่กลับไปคว่ำหน้าเรียงนิ่งๆ อยู่ที่เดิมด้านล่าง
+        function sendCardBack(card) {
+            card.userData.isRevealed = false;
+            if (activeRevealedCard === card) activeRevealedCard = null;
 
+            document.getElementById('status-text').innerText = "✨ 運命のカードを1枚クリックしてください (คลิกเลือกไพ่แห่งโชคชะตา 1 ใบ) ✨";
+            document.getElementById('status-text').style.color = "#ffd700";
+
+            gsap.to(card.position, { x: card.userData.origX, y: card.userData.origY, z: card.userData.origZ, duration: 0.5, ease: "power2.inOut" });
+            gsap.to(card.rotation, { x: card.userData.origRx, y: card.userData.origRy, z: card.userData.origRz, duration: 0.5, ease: "power2.inOut" });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // ทำให้พื้นหลังดวงดาวหมุนเอื่อยๆ เพิ่มความลึกลับมีมิติ
+            if (starPoints) {
+                starPoints.rotation.y += 0.0003;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // เริ่มต้นการทำงานระบบ
+        init3D();
+        animate();
+    </script>
 </body>
 </html>
