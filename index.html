@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🔮 Cinematic Tarot Circle Student Picker</title>
+    <title>🔮 今日の一枚 - AI Tarot Oracle</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
@@ -11,13 +11,15 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Noto+Serif+JP:wght@500;700&family=Prompt:wght@400;600&display=swap');
+
         body {
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #02000a;
-            font-family: 'Prompt', sans-serif;
-            color: #ffd700;
+            background: radial-gradient(circle at center, #15002b 0%, #030010 100%);
+            font-family: 'Noto Serif JP', 'Cinzel', 'Prompt', sans-serif;
+            color: #fff;
         }
 
         #canvas-container {
@@ -27,10 +29,10 @@
             z-index: 1;
         }
 
-        /* ส่วนหัวข้อและสถานะด้านบน */
+        /* Japanese Fortune Teller UI Design */
         .ui-header {
             position: absolute;
-            top: 20px;
+            top: 30px;
             width: 100%;
             text-align: center;
             z-index: 10;
@@ -38,33 +40,49 @@
         }
 
         h1 {
-            font-size: 2.2rem;
+            font-size: 2.5rem;
             margin: 0;
-            letter-spacing: 3px;
-            text-shadow: 0 0 20px rgba(147, 51, 234, 0.8), 0 0 10px rgba(255, 215, 0, 0.5);
-            color: #f3e5ab;
+            font-weight: 700;
+            letter-spacing: 4px;
+            background: linear-gradient(135deg, #fff7d6 0%, #ffd700 50%, #cca100 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(139, 92, 246, 0.6);
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            color: #e9d5ff;
+            margin-top: 5px;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(168, 85, 247, 0.4);
         }
 
         .status {
-            color: #d8b4fe;
-            font-size: 1.2rem;
-            margin-top: 8px;
-            text-shadow: 0 0 8px rgba(0,0,0,0.5);
+            color: #a78bfa;
+            font-size: 1rem;
+            margin-top: 12px;
+            background: rgba(15, 5, 30, 0.6);
+            padding: 6px 20px;
+            display: inline-block;
+            border-radius: 20px;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            backdrop-filter: blur(5px);
         }
 
-        /* กล่องส่องเว็บแคมมุมขวาล่าง */
+        /* Webcam Frame - Bottom Right Corner */
         .webcam-preview {
             position: absolute;
-            bottom: 20px;
-            right: 20px;
-            width: 160px;
-            height: 120px;
-            border: 2px solid rgba(147, 51, 234, 0.6);
+            bottom: 25px;
+            right: 25px;
+            width: 150px;
+            height: 112px;
+            border: 2px solid rgba(168, 85, 247, 0.5);
             border-radius: 12px;
             overflow: hidden;
             z-index: 10;
             transform: scaleX(-1);
-            box-shadow: 0 0 20px rgba(0,0,0,0.9);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
         }
 
         #webcam {
@@ -79,26 +97,30 @@
     <div id="canvas-container"></div>
 
     <div class="ui-header">
-        <h1>🔮 มนตราไพ่ทาโรต์สุ่มนักเรียน 🔮</h1>
-        <div class="status" id="status-text">✨ กำลังเปิดประตูมิติกล้องเว็บแคม... ✨</div>
+        <h1>🔮 今日の一枚 • AI タロット 🔮</h1>
+        <div class="subtitle">ส่องพลังนิ้วลิขิตดวงทาโรต์นักเรียน</div>
+        <div class="status" id="status-text">🪐 占いの館へようこそ (กำลังเชื่อมต่อดวงดาว...) 🪐</div>
     </div>
 
     <div class="webcam-preview">
-        <video id="webcam" autoplay playsinline></video>
+        <video id="webcam" autoplay playsinline muted></video>
     </div>
 
     <script>
-        // ----------------- ระบบดึงรูปภาพ -----------------
-        // รองรับทั้งโฟลเดอร์ image หรือ images (โค้ดจะลองหาจาก image/ ก่อน ถ้าคุณครูใช้โฟลเดอร์ชื่อนั้น)
-        const totalStudents = 25;
+        // ----------------- ข้อมูลนักเรียนและการประมวลผลวนซ้ำ -----------------
+        const uniqueStudentsCount = 25; // รูปจริงของคุณครู 25 รูป
+        const totalCardsInCircle = 72;   // สร้างจำนวนการ์ดให้เยอะและหนาแน่นเป็นวงสวยงามแบบไพ่จริง
         const students = [];
-        for (let i = 1; i <= totalStudents; i++) {
+
+        for (let i = 0; i < totalCardsInCircle; i++) {
+            // ใช้คณิตศาสตร์หารเอาเศษ (Modulo) วนลำดับรูป 1.png ถึง 25.png ไปเรื่อยๆ จนเต็มวง
+            const studentId = (i % uniqueStudentsCount) + 1;
             students.push({
-                id: i,
-                imgFront: `image/${i}.png` // ดึงไฟล์ 1.png ถึง 25.png จากโฟลเดอร์ภาพของคุณครู
+                id: studentId,
+                imgFront: `image/${studentId}.png` 
             });
         }
-        // --------------------------------------------------------
+        // ------------------------------------------------------------------
 
         let scene, camera, renderer, cardsGroup, starField;
         let pointerSphere;
@@ -110,68 +132,60 @@
             const container = document.getElementById('canvas-container');
             
             scene = new THREE.Scene();
-            // หมอกสีม่วงเข้มฟีลกลางคืนลึกลับ
-            scene.fog = new THREE.FogExp2(0x0a001a, 0.015);
+            scene.fog = new THREE.FogExp2(0x050012, 0.02);
 
-            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 0, 8.5); 
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, -1.5, 9); // ปรับมุมกล้องให้กดเสยขึ้นเล็กน้อย เพิ่มความโอ่อ่า
 
-            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
             container.appendChild(renderer.domElement);
 
-            // แสงสว่างโทนสีม่วง-ทองแบบ Cinematic
-            scene.add(new THREE.AmbientLight(0x5533aa, 2.5));
-            const dirLight = new THREE.DirectionalLight(0xffdfa9, 1.8);
-            dirLight.position.set(0, 8, 5);
-            scene.add(dirLight);
+            // แสงสว่างโทนเวทมนตร์ลึกลับ
+            scene.add(new THREE.AmbientLight(0x4c1d95, 3.0)); 
+            const topLight = new THREE.DirectionalLight(0xffedd5, 2.0);
+            topLight.position.set(0, 10, 8);
+            scene.add(topLight);
 
-            // สร้างพื้นหลังดวงดาวระยิบระยับ (Galaxy Starfield)
             createGalaxyBackground();
 
-            // กลุ่มหลักสำหรับวางไพ่เป็นวงรี
             cardsGroup = new THREE.Group();
             scene.add(cardsGroup);
 
-            createTarotEllipse();
+            createLuxuryTarotFan();
 
-            // จุดเรืองแสงเวทมนตร์สีฟ้าตามปลายนิ้วชี้
-            const pointerGeo = new THREE.SphereGeometry(0.12, 32, 32);
-            const pointerMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.8 });
+            // จุดแสงเวทมนตร์สีอควาติดตามปลายนิ้ว
+            const pointerGeo = new THREE.SphereGeometry(0.1, 32, 32);
+            const pointerMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, transparent: true, opacity: 0.8 });
             pointerSphere = new THREE.Mesh(pointerGeo, pointerMat);
             scene.add(pointerSphere);
 
             window.addEventListener('resize', onWindowResize);
         }
 
-        // ฟังก์ชันสร้างฉากหลังอวกาศ/ทางช้างเผือกสีม่วง
         function createGalaxyBackground() {
-            const starCount = 1500;
+            const starCount = 2000;
             const geometry = new THREE.BufferGeometry();
             const positions = new Float32Array(starCount * 3);
             const colors = new Float32Array(starCount * 3);
 
             for (let i = 0; i < starCount * 3; i += 3) {
-                // กระจายดวงดาวเป็นทรงกลมล้อมรอบห้อง
-                const radius = 20 + Math.random() * 30;
-                const u = Math.random();
-                const v = Math.random();
-                const theta = u * 2.0 * Math.PI;
-                const phi = Math.acos(2.0 * v - 1.0);
+                const radius = 15 + Math.random() * 25;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos((Math.random() * 2) - 1);
                 
                 positions[i] = radius * Math.sin(phi) * Math.cos(theta);
                 positions[i+1] = radius * Math.sin(phi) * Math.sin(theta);
                 positions[i+2] = radius * Math.cos(phi);
 
-                // สุ่มสีดวงดาว (เน้นสีม่วง, ฟ้า, ชมพู, ทอง)
                 const rand = Math.random();
-                if (rand > 0.6) {
-                    colors[i] = 0.7; colors[i+1] = 0.5; colors[i+2] = 1.0; // ม่วงออร่า
-                } else if (rand > 0.3) {
-                    colors[i] = 0.4; colors[i+1] = 0.8; colors[i+2] = 1.0; // ฟ้าดวงดาว
+                if (rand > 0.7) {
+                    colors[i] = 0.8; colors[i+1] = 0.6; colors[i+2] = 1.0; 
+                } else if (rand > 0.4) {
+                    colors[i] = 0.3; colors[i+1] = 0.9; colors[i+2] = 1.0; 
                 } else {
-                    colors[i] = 1.0; colors[i+1] = 0.85; colors[i+2] = 0.5; // ทองประกาย
+                    colors[i] = 1.0; colors[i+1] = 0.9; colors[i+2] = 0.6; 
                 }
             }
 
@@ -179,65 +193,73 @@
             geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
             const material = new THREE.PointsMaterial({
-                size: 0.15,
+                size: 0.12,
                 vertexColors: true,
                 transparent: true,
-                opacity: 0.8
+                opacity: 0.7
             });
 
             starField = new THREE.Points(geometry, material);
             scene.add(starField);
         }
 
-        // ฟังก์ชันจัดวางไพ่แบบ "วงรี" และ "คว่ำหน้าลงทั้งหมด"
-        function createTarotEllipse() {
-            const radiusX = 4.2; // ความกว้างของวงรีแกน X
-            const radiusY = 2.8; // ความสูงของวงรีแกน Y
-            const cardW = 0.65;  
-            const cardH = 1.05;
+        // ดีไซน์หลังไพ่เวทมนตร์ออโต้สไตล์ญี่ปุ่น และเรียงการ์ดถี่ซ้อนทับกันแบบพัดวงรีที่สวยงาม
+        function createLuxuryTarotFan() {
+            const radiusX = 4.8; // ขยายความกว้างวงรีซ้ายขวา
+            const radiusY = 3.2; // ขยายความลึกวงรีบนล่าง
+            const cardW = 0.7;   
+            const cardH = 1.15;
             
             const textureLoader = new THREE.TextureLoader();
 
+            // วาดพื้นผิวหลังไพ่สีม่วงเข้มขอบทองจักรราศีลึกลับ (ไม่ต้องใช้ไฟล์รูปภาพ)
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 384;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#1e0038'; ctx.fillRect(0, 0, 256, 384);
+            ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 8; ctx.strokeRect(12, 12, 232, 360);
+            ctx.strokeStyle = '#a855f7'; ctx.lineWidth = 2; ctx.strokeRect(20, 20, 216, 344);
+            ctx.fillStyle = '#ffd700'; ctx.font = '48px serif'; ctx.fillText('✨', 104, 180);
+            ctx.strokeStyle = 'rgba(255,215,0,0.3)'; ctx.arc(128, 165, 50, 0, Math.PI*2); ctx.stroke();
+            const backTexture = new THREE.CanvasTexture(canvas);
+
             students.forEach((student, index) => {
                 const cardPivot = new THREE.Group();
-                const angle = (index / totalStudents) * Math.PI * 2;
+                const angle = (index / totalCardsInCircle) * Math.PI * 2;
 
-                const cardGeo = new THREE.BoxGeometry(cardW, cardH, 0.02);
+                const cardGeo = new THREE.BoxGeometry(cardW, cardH, 0.015);
+                const backMat = new THREE.MeshStandardMaterial({ map: backTexture, roughness: 0.3, metalness: 0.4 });
                 
-                // หลังไพ่สีม่วงเข้มขอบทองลึกลับ
-                const backMat = new THREE.MeshStandardMaterial({ color: 0x240046, roughness: 0.4, metalness: 0.6 });
-                
-                // หน้าไพ่รูปนักเรียน
-                const frontTex = textureLoader.load(student.imgFront, undefined, undefined, (err) => {
-                    // หากครูใช้โฟลเดอร์ชื่อ images (มี s) ให้ลองดึงจากโฟลเดอร์นั้นแทนอัตโนมัติ
+                const frontTex = textureLoader.load(student.imgFront, undefined, undefined, () => {
+                    // แผนสำรองกรณีหาไฟล์โฟลเดอร์สลับไปมา
                     frontTex.image.src = `images/${student.id}.png`;
                 });
-                const frontMat = new THREE.MeshStandardMaterial({ map: frontTex, roughness: 0.2 });
+                const frontMat = new THREE.MeshStandardMaterial({ map: frontTex, roughness: 0.15 });
 
-                // แมททีเรียล 6 ด้านของกล่องไพ่ 
-                // *** ปรับแก้: ให้หน้าไพ่อยู่ด้านหลัง เพื่อให้ตอนแรกไพ่คว่ำหน้าลงทั้งหมด ***
                 const materials = [
                     backMat, backMat, backMat, backMat, 
-                    backMat,  // ด้านหน้ากล่อง (แสดงตอนแรก -> คว่ำไพ่)
-                    frontMat  // ด้านหลังกล่อง (แสดงตอนพลิกการ์ด -> หงายไพ่)
+                    backMat, // คว่ำหน้าโชว์ลายเวทมนตร์ตอนแรก
+                    frontMat  // หงายรูปนักเรียนตอนสแกนเจอ
                 ];
 
                 const cardMesh = new THREE.Mesh(cardGeo, materials);
                 cardMesh.position.set(0, 0, 0);
                 cardPivot.add(cardMesh);
 
-                // พิกัดสูตรคณิตศาสตร์จัดวางรูป "วงรี (Ellipse)"
+                // พิกัดวงรีและองศาเอียงเฉียงสโลปซ้อนทับกันแบบมิติ Cinematic
                 cardPivot.position.x = Math.cos(angle) * radiusX;
                 cardPivot.position.y = Math.sin(angle) * radiusY;
+                cardPivot.position.z = -Math.abs(Math.sin(angle)) * 0.5; // ให้ไพ่ด้านหลังดูลึกถอยห่างออกไป
                 
-                // หันองศาไพ่ให้ชี้ออกจากศูนย์กลางวงรีอย่างสวยงาม
                 cardPivot.rotation.z = angle - Math.PI / 2;
+                cardPivot.rotation.y = 0; 
 
-                // บันทึกค่าดั้งเดิมไว้ดึงกลับที่เดิม
                 cardPivot.userData = {
                     index: index,
+                    studentId: student.id,
                     origX: cardPivot.position.x,
                     origY: cardPivot.position.y,
+                    origZ: cardPivot.position.z,
                     origRz: cardPivot.rotation.z,
                     isChosen: false
                 };
@@ -246,22 +268,17 @@
             });
         }
 
-        // แอนิเมชันลูปเรนเดอร์ภาพ
         function animate() {
             requestAnimationFrame(animate);
 
-            // สั่งให้พื้นหลังดวงดาวหมุนช้าๆ เพิ่มความสมจริงของห้วงอวกาศ
             if(starField) {
-                starField.rotation.y += 0.0005;
-                starField.rotation.x += 0.0002;
+                starField.rotation.y += 0.0003;
             }
 
-            // ถ้าไม่มีไพ่ใบไหนถูกเลือก ให้วงรีไพ่หมุนเอื่อยๆ คล้ายจักรราศี
             if (!activeCard) {
-                cardsGroup.rotation.z += 0.0015;
+                cardsGroup.rotation.z -= 0.001; // วงหมุนตามเข็มนาฬิกาเอื่อยๆ ดูลึกลับ
             }
 
-            // ระบบตรวจสอบนิ้วชี้ชนกับไพ่
             raycaster.setFromCamera(hand2D, camera);
             const intersects = raycaster.intersectObjects(cardsGroup.children, true);
 
@@ -270,12 +287,11 @@
                 let collidedCard = hitMesh.parent;
 
                 let target3D = new THREE.Vector3();
-                raycaster.ray.at(6.5, target3D);
+                raycaster.ray.at(6.8, target3D);
                 pointerSphere.position.copy(target3D);
 
                 if (activeCard !== collidedCard) {
                     if (activeCard) resetCard(activeCard);
-                    
                     activeCard = collidedCard;
                     selectCard(activeCard);
                 }
@@ -290,28 +306,23 @@
             renderer.render(scene, camera);
         }
 
-        // ดึงไพ่มาตรงกลางวงรีลอยเด่น แล้ว "พลิกหงายหน้าไพ่"
         function selectCard(card) {
             card.userData.isChosen = true;
-            document.getElementById('status-text').innerText = `✨ ชะตาลิขิตเลือกไพ่ใบที่ ${card.userData.index + 1} ✨`;
-            document.getElementById('status-text').style.color = "#a855f7";
+            document.getElementById('status-text').innerText = `🔮 運命のカード：生徒番号 ${card.userData.studentId} 番 (ไพ่ลิขิตนักเรียนคนที่ ${card.userData.studentId}) 🔮`;
+            document.getElementById('status-text').style.color = "#ffd700";
 
-            // 1. ดึงการ์ดพุ่งเข้ามาที่พิกัดตรงกลางวงรี (0, 0) และลอยเข้าใกล้กล้องมากขึ้น (z: 3.5)
-            gsap.to(card.position, { x: 0, y: 0, z: 3.5, duration: 0.6, ease: "power2.out" });
-            
-            // 2. พลิกหมุนการ์ด 180 องศา (Math.PI) เพื่อหงายหน้าไพ่โชว์รูปนักเรียนออกหน้าจอ
-            gsap.to(card.rotation, { x: 0, y: Math.PI, z: 0, duration: 0.6, ease: "power2.out" });
+            // บินพุ่งมาตรงกลางวง ขยายหน้าตัก และพลิกหงาย 180 องศาเพื่อส่องรูปนักเรียนฉลุยชัดเจน
+            gsap.to(card.position, { x: 0, y: 1.0, z: 4.5, duration: 0.5, ease: "power2.out" });
+            gsap.to(card.rotation, { x: 0, y: Math.PI, z: 0, duration: 0.5, ease: "power2.out" });
         }
 
-        // ส่งไพ่บินกลับไปต่อแถวในตำแหน่งวงรีตามเดิม และ "คว่ำหน้าลง" เหมือนเดิม
         function resetCard(card) {
             card.userData.isChosen = false;
-            document.getElementById('status-text').innerText = "🖐 ชูนิ้วชี้ส่องกล้อง เลื่อนเพื่อเลือกไพ่ทาโรต์ผู้โชคดี";
-            document.getElementById('status-text').style.color = "#d8b4fe";
+            document.getElementById('status-text').innerText = "🖐 人差し指をかざして、運命の一枚を選んでください (ชูนิ้วชี้เพื่อเลือกไพ่ดวงใจ)";
+            document.getElementById('status-text').style.color = "#a78bfa";
 
-            // บินกลับพิกัดวงรีเดิม หมุนหน้าไพ่คว่ำกลับไปด้านหลังเหมือนตอนแรก
-            gsap.to(card.position, { x: card.userData.origX, y: card.userData.origY, z: 0, duration: 0.6, ease: "power2.inOut" });
-            gsap.to(card.rotation, { x: 0, y: 0, z: card.userData.origRz, duration: 0.6, ease: "power2.inOut" });
+            gsap.to(card.position, { x: card.userData.origX, y: card.userData.origY, z: card.userData.origZ, duration: 0.5, ease: "power2.inOut" });
+            gsap.to(card.rotation, { x: 0, y: 0, z: card.userData.origRz, duration: 0.5, ease: "power2.inOut" });
         }
 
         function onWindowResize() {
@@ -320,18 +331,18 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        // --- ระบบ AI ตรวจจับนิ้วชี้ (MediaPipe) ---
+        // ----------------- อัปเกรดระบบกล้องเชื่อมต่อ Browser เสถียรสูง -----------------
         const videoElement = document.getElementById('webcam');
         const statusText = document.getElementById('status-text');
 
         function onResults(results) {
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const indexTip = results.multiHandLandmarks[0][8]; // ปลายนิ้วชี้
-
-                hand2D.x = -(indexTip.x * 2 - 1); // ลบข้างหน้าเพื่อกลับด้านกระจกเงา
-                hand2D.y = -(indexTip.y * 2 - 1);
+                // พิกัดข้อต่อปลายนิ้วชี้เบอร์ 8
+                const indexTip = results.multiHandLandmarks[0][8];
+                hand2D.x = -(indexTip.x * 2 - 1); 
+                hand2D.y = -(indexTip.y * 2 - 1) + 0.3; // ชดเชยระยะเยื้องนิ้วให้ชี้สนุกขึ้น
             } else {
-                hand2D.set(-999, -999); // เอามือออกให้พิกัดหายไป
+                hand2D.set(-999, -999);
             }
         }
 
@@ -341,27 +352,41 @@
         hands.setOptions({
             maxNumHands: 1,
             modelComplexity: 1,
-            minDetectionConfidence: 0.6,
-            minTrackingConfidence: 0.6
+            minDetectionConfidence: 0.45, // ปรับลดเล็กน้อยเพื่อให้จับนิ้วไวขึ้น ไม่หลุดง่าย
+            minTrackingConfidence: 0.45
         });
         hands.onResults(onResults);
 
-        const cameraStream = new Camera(videoElement, {
-            onFrame: async () => {
-                await hands.send({ image: videoElement });
-            },
-            width: 320,
-            height: 240
-        });
+        // ดึงสิทธิ์กล้องแบบ Native WebRTC Stream (แก้ปัญหากล้องค้าง ล็อก ถ่ายไม่ติด)
+        async function setupWebcam() {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { width: 640, height: 480, facingMode: "user" }
+                    });
+                    videoElement.srcObject = stream;
+                    
+                    // รันเฟรมวิดีโอส่งเข้าสมองกล AI แฮนด์แทร็กกิ้ง
+                    async function detectionLoop() {
+                        if (videoElement.readyState >= 3) {
+                            await hands.send({ image: videoElement });
+                        }
+                        requestAnimationFrame(detectionLoop);
+                    }
+                    detectionLoop();
+                    statusText.innerText = "🖐 人差し指をかざして、運命の一枚を選んでください (ชูนิ้วชี้เพื่อเลือกไพ่ดวงใจ)";
+                } catch (error) {
+                    statusText.innerText = "⚠️ กล้องถูกบล็อกสิทธิ์หรือถูกโปรแกรมอื่นดึงไปใช้งานอยู่";
+                    console.error(error);
+                }
+            } else {
+                statusText.innerText = "⚠️ เบราว์เซอร์นี้ไม่รองรับระบบกล้อง";
+            }
+        }
 
         init3D();
         animate();
-
-        cameraStream.start().then(() => {
-            statusText.innerText = "🖐 ชูนิ้วชี้ส่องกล้อง เลื่อนเพื่อเลือกไพ่ทาโรต์ผู้โชคดี";
-        }).catch(err => {
-            statusText.innerText = "⚠️ ไม่สามารถเข้าถึงกล้องเว็บแคมได้";
-        });
+        setupWebcam();
     </script>
 </body>
 </html>
