@@ -15,7 +15,7 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #050014;
+            background-color: #02000a;
             font-family: 'Prompt', sans-serif;
             color: #ffd700;
         }
@@ -38,16 +38,18 @@
         }
 
         h1 {
-            font-size: 2rem;
+            font-size: 2.2rem;
             margin: 0;
-            letter-spacing: 2px;
-            text-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+            letter-spacing: 3px;
+            text-shadow: 0 0 20px rgba(147, 51, 234, 0.8), 0 0 10px rgba(255, 215, 0, 0.5);
+            color: #f3e5ab;
         }
 
         .status {
-            color: #b39ddb;
-            font-size: 1.1rem;
-            margin-top: 5px;
+            color: #d8b4fe;
+            font-size: 1.2rem;
+            margin-top: 8px;
+            text-shadow: 0 0 8px rgba(0,0,0,0.5);
         }
 
         /* กล่องส่องเว็บแคมมุมขวาล่าง */
@@ -57,12 +59,12 @@
             right: 20px;
             width: 160px;
             height: 120px;
-            border: 2px solid rgba(255, 215, 0, 0.4);
-            border-radius: 10px;
+            border: 2px solid rgba(147, 51, 234, 0.6);
+            border-radius: 12px;
             overflow: hidden;
             z-index: 10;
             transform: scaleX(-1);
-            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            box-shadow: 0 0 20px rgba(0,0,0,0.9);
         }
 
         #webcam {
@@ -77,8 +79,8 @@
     <div id="canvas-container"></div>
 
     <div class="ui-header">
-        <h1>🔮 วงล้อคาถาทาโรต์สุ่มนักเรียน 🔮</h1>
-        <div class="status" id="status-text">✨ กำลังรวบรวมพลังงานกล้อง... ✨</div>
+        <h1>🔮 มนตราไพ่ทาโรต์สุ่มนักเรียน 🔮</h1>
+        <div class="status" id="status-text">✨ กำลังเปิดประตูมิติกล้องเว็บแคม... ✨</div>
     </div>
 
     <div class="webcam-preview">
@@ -86,19 +88,19 @@
     </div>
 
     <script>
-        // ----------------- ระบบดึงรูปภาพอัตโนมัติ -----------------
-        // ดึงไฟล์ภาพจากโฟลเดอร์ images/1.png ถึง images/25.png ตรงตามที่คุณตั้งไว้เป๊ะ ๆ ครับ
+        // ----------------- ระบบดึงรูปภาพ -----------------
+        // รองรับทั้งโฟลเดอร์ image หรือ images (โค้ดจะลองหาจาก image/ ก่อน ถ้าคุณครูใช้โฟลเดอร์ชื่อนั้น)
         const totalStudents = 25;
         const students = [];
         for (let i = 1; i <= totalStudents; i++) {
             students.push({
                 id: i,
-                imgFront: `images/${i}.png` 
+                imgFront: `image/${i}.png` // ดึงไฟล์ 1.png ถึง 25.png จากโฟลเดอร์ภาพของคุณครู
             });
         }
         // --------------------------------------------------------
 
-        let scene, camera, renderer, cardsGroup;
+        let scene, camera, renderer, cardsGroup, starField;
         let pointerSphere;
         let raycaster = new THREE.Raycaster();
         let hand2D = new THREE.Vector2(-999, -999);
@@ -108,27 +110,34 @@
             const container = document.getElementById('canvas-container');
             
             scene = new THREE.Scene();
-            scene.fog = new THREE.FogExp2(0x050014, 0.02);
+            // หมอกสีม่วงเข้มฟีลกลางคืนลึกลับ
+            scene.fog = new THREE.FogExp2(0x0a001a, 0.015);
 
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 0, 8); 
+            camera.position.set(0, 0, 8.5); 
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
             container.appendChild(renderer.domElement);
 
-            scene.add(new THREE.AmbientLight(0x442266, 2));
-            const dirLight = new THREE.DirectionalLight(0xffddaa, 1.5);
-            dirLight.position.set(0, 5, 5);
+            // แสงสว่างโทนสีม่วง-ทองแบบ Cinematic
+            scene.add(new THREE.AmbientLight(0x5533aa, 2.5));
+            const dirLight = new THREE.DirectionalLight(0xffdfa9, 1.8);
+            dirLight.position.set(0, 8, 5);
             scene.add(dirLight);
 
+            // สร้างพื้นหลังดวงดาวระยิบระยับ (Galaxy Starfield)
+            createGalaxyBackground();
+
+            // กลุ่มหลักสำหรับวางไพ่เป็นวงรี
             cardsGroup = new THREE.Group();
             scene.add(cardsGroup);
 
-            createTarotCircle();
+            createTarotEllipse();
 
-            const pointerGeo = new THREE.SphereGeometry(0.1, 32, 32);
+            // จุดเรืองแสงเวทมนตร์สีฟ้าตามปลายนิ้วชี้
+            const pointerGeo = new THREE.SphereGeometry(0.12, 32, 32);
             const pointerMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.8 });
             pointerSphere = new THREE.Mesh(pointerGeo, pointerMat);
             scene.add(pointerSphere);
@@ -136,10 +145,56 @@
             window.addEventListener('resize', onWindowResize);
         }
 
-        function createTarotCircle() {
-            const radius = 3.5; 
-            const cardW = 0.6;  
-            const cardH = 1.0;
+        // ฟังก์ชันสร้างฉากหลังอวกาศ/ทางช้างเผือกสีม่วง
+        function createGalaxyBackground() {
+            const starCount = 1500;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(starCount * 3);
+            const colors = new Float32Array(starCount * 3);
+
+            for (let i = 0; i < starCount * 3; i += 3) {
+                // กระจายดวงดาวเป็นทรงกลมล้อมรอบห้อง
+                const radius = 20 + Math.random() * 30;
+                const u = Math.random();
+                const v = Math.random();
+                const theta = u * 2.0 * Math.PI;
+                const phi = Math.acos(2.0 * v - 1.0);
+                
+                positions[i] = radius * Math.sin(phi) * Math.cos(theta);
+                positions[i+1] = radius * Math.sin(phi) * Math.sin(theta);
+                positions[i+2] = radius * Math.cos(phi);
+
+                // สุ่มสีดวงดาว (เน้นสีม่วง, ฟ้า, ชมพู, ทอง)
+                const rand = Math.random();
+                if (rand > 0.6) {
+                    colors[i] = 0.7; colors[i+1] = 0.5; colors[i+2] = 1.0; // ม่วงออร่า
+                } else if (rand > 0.3) {
+                    colors[i] = 0.4; colors[i+1] = 0.8; colors[i+2] = 1.0; // ฟ้าดวงดาว
+                } else {
+                    colors[i] = 1.0; colors[i+1] = 0.85; colors[i+2] = 0.5; // ทองประกาย
+                }
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const material = new THREE.PointsMaterial({
+                size: 0.15,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            starField = new THREE.Points(geometry, material);
+            scene.add(starField);
+        }
+
+        // ฟังก์ชันจัดวางไพ่แบบ "วงรี" และ "คว่ำหน้าลงทั้งหมด"
+        function createTarotEllipse() {
+            const radiusX = 4.2; // ความกว้างของวงรีแกน X
+            const radiusY = 2.8; // ความสูงของวงรีแกน Y
+            const cardW = 0.65;  
+            const cardH = 1.05;
             
             const textureLoader = new THREE.TextureLoader();
 
@@ -148,28 +203,37 @@
                 const angle = (index / totalStudents) * Math.PI * 2;
 
                 const cardGeo = new THREE.BoxGeometry(cardW, cardH, 0.02);
-                const backMat = new THREE.MeshStandardMaterial({ color: 0x2a004f, roughness: 0.3, metalness: 0.5 });
                 
-                // โหลดรูปหน้าไพ่ (.png) ของคุณครู เข้าสู่ระบบ 3D
+                // หลังไพ่สีม่วงเข้มขอบทองลึกลับ
+                const backMat = new THREE.MeshStandardMaterial({ color: 0x240046, roughness: 0.4, metalness: 0.6 });
+                
+                // หน้าไพ่รูปนักเรียน
                 const frontTex = textureLoader.load(student.imgFront, undefined, undefined, (err) => {
-                    frontMat.color.setHex(0xd4af37); // ถ้าหาไฟล์ไม่เจอ จะแสดงเป็นแผ่นสีทองแทน
+                    // หากครูใช้โฟลเดอร์ชื่อ images (มี s) ให้ลองดึงจากโฟลเดอร์นั้นแทนอัตโนมัติ
+                    frontTex.image.src = `images/${student.id}.png`;
                 });
                 const frontMat = new THREE.MeshStandardMaterial({ map: frontTex, roughness: 0.2 });
 
+                // แมททีเรียล 6 ด้านของกล่องไพ่ 
+                // *** ปรับแก้: ให้หน้าไพ่อยู่ด้านหลัง เพื่อให้ตอนแรกไพ่คว่ำหน้าลงทั้งหมด ***
                 const materials = [
                     backMat, backMat, backMat, backMat, 
-                    frontMat, // ด้านหน้า
-                    backMat   // ด้านหลัง
+                    backMat,  // ด้านหน้ากล่อง (แสดงตอนแรก -> คว่ำไพ่)
+                    frontMat  // ด้านหลังกล่อง (แสดงตอนพลิกการ์ด -> หงายไพ่)
                 ];
 
                 const cardMesh = new THREE.Mesh(cardGeo, materials);
                 cardMesh.position.set(0, 0, 0);
                 cardPivot.add(cardMesh);
 
-                cardPivot.position.x = Math.cos(angle) * radius;
-                cardPivot.position.y = Math.sin(angle) * radius;
+                // พิกัดสูตรคณิตศาสตร์จัดวางรูป "วงรี (Ellipse)"
+                cardPivot.position.x = Math.cos(angle) * radiusX;
+                cardPivot.position.y = Math.sin(angle) * radiusY;
+                
+                // หันองศาไพ่ให้ชี้ออกจากศูนย์กลางวงรีอย่างสวยงาม
                 cardPivot.rotation.z = angle - Math.PI / 2;
 
+                // บันทึกค่าดั้งเดิมไว้ดึงกลับที่เดิม
                 cardPivot.userData = {
                     index: index,
                     origX: cardPivot.position.x,
@@ -182,13 +246,22 @@
             });
         }
 
+        // แอนิเมชันลูปเรนเดอร์ภาพ
         function animate() {
             requestAnimationFrame(animate);
 
-            if (!activeCard) {
-                cardsGroup.rotation.z += 0.002; // วงล้อหมุนเองเรื่อยๆ ตอนยังไม่เลือก
+            // สั่งให้พื้นหลังดวงดาวหมุนช้าๆ เพิ่มความสมจริงของห้วงอวกาศ
+            if(starField) {
+                starField.rotation.y += 0.0005;
+                starField.rotation.x += 0.0002;
             }
 
+            // ถ้าไม่มีไพ่ใบไหนถูกเลือก ให้วงรีไพ่หมุนเอื่อยๆ คล้ายจักรราศี
+            if (!activeCard) {
+                cardsGroup.rotation.z += 0.0015;
+            }
+
+            // ระบบตรวจสอบนิ้วชี้ชนกับไพ่
             raycaster.setFromCamera(hand2D, camera);
             const intersects = raycaster.intersectObjects(cardsGroup.children, true);
 
@@ -197,7 +270,7 @@
                 let collidedCard = hitMesh.parent;
 
                 let target3D = new THREE.Vector3();
-                raycaster.ray.at(6, target3D);
+                raycaster.ray.at(6.5, target3D);
                 pointerSphere.position.copy(target3D);
 
                 if (activeCard !== collidedCard) {
@@ -217,21 +290,26 @@
             renderer.render(scene, camera);
         }
 
+        // ดึงไพ่มาตรงกลางวงรีลอยเด่น แล้ว "พลิกหงายหน้าไพ่"
         function selectCard(card) {
             card.userData.isChosen = true;
             document.getElementById('status-text').innerText = `✨ ชะตาลิขิตเลือกไพ่ใบที่ ${card.userData.index + 1} ✨`;
-            document.getElementById('status-text').style.color = "#00ffff";
+            document.getElementById('status-text').style.color = "#a855f7";
 
-            // ดึงการ์ดมาตรงกลาง ขยายใหญ่ และหมุน 180 องศาเพื่อโชว์รูปนักเรียน (.png) ที่คุณเตรียมไว้
-            gsap.to(card.position, { x: 0, y: 0, z: 3, duration: 0.6, ease: "power2.out" });
+            // 1. ดึงการ์ดพุ่งเข้ามาที่พิกัดตรงกลางวงรี (0, 0) และลอยเข้าใกล้กล้องมากขึ้น (z: 3.5)
+            gsap.to(card.position, { x: 0, y: 0, z: 3.5, duration: 0.6, ease: "power2.out" });
+            
+            // 2. พลิกหมุนการ์ด 180 องศา (Math.PI) เพื่อหงายหน้าไพ่โชว์รูปนักเรียนออกหน้าจอ
             gsap.to(card.rotation, { x: 0, y: Math.PI, z: 0, duration: 0.6, ease: "power2.out" });
         }
 
+        // ส่งไพ่บินกลับไปต่อแถวในตำแหน่งวงรีตามเดิม และ "คว่ำหน้าลง" เหมือนเดิม
         function resetCard(card) {
             card.userData.isChosen = false;
-            document.getElementById('status-text').innerText = "🖐 ยื่นนิ้วชี้ของคุณเข้าหากล้อง เพื่อเลือกไพ่ผู้โชคดี";
-            document.getElementById('status-text').style.color = "#b39ddb";
+            document.getElementById('status-text').innerText = "🖐 ชูนิ้วชี้ส่องกล้อง เลื่อนเพื่อเลือกไพ่ทาโรต์ผู้โชคดี";
+            document.getElementById('status-text').style.color = "#d8b4fe";
 
+            // บินกลับพิกัดวงรีเดิม หมุนหน้าไพ่คว่ำกลับไปด้านหลังเหมือนตอนแรก
             gsap.to(card.position, { x: card.userData.origX, y: card.userData.origY, z: 0, duration: 0.6, ease: "power2.inOut" });
             gsap.to(card.rotation, { x: 0, y: 0, z: card.userData.origRz, duration: 0.6, ease: "power2.inOut" });
         }
@@ -250,10 +328,10 @@
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const indexTip = results.multiHandLandmarks[0][8]; // ปลายนิ้วชี้
 
-                hand2D.x = -(indexTip.x * 2 - 1); 
+                hand2D.x = -(indexTip.x * 2 - 1); // ลบข้างหน้าเพื่อกลับด้านกระจกเงา
                 hand2D.y = -(indexTip.y * 2 - 1);
             } else {
-                hand2D.set(-999, -999);
+                hand2D.set(-999, -999); // เอามือออกให้พิกัดหายไป
             }
         }
 
@@ -280,7 +358,7 @@
         animate();
 
         cameraStream.start().then(() => {
-            statusText.innerText = "🖐 ยื่นนิ้วชี้ของคุณเข้าหากล้อง เพื่อเลือกไพ่ผู้โชคดี";
+            statusText.innerText = "🖐 ชูนิ้วชี้ส่องกล้อง เลื่อนเพื่อเลือกไพ่ทาโรต์ผู้โชคดี";
         }).catch(err => {
             statusText.innerText = "⚠️ ไม่สามารถเข้าถึงกล้องเว็บแคมได้";
         });
